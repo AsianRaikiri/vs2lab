@@ -42,6 +42,38 @@ class Server:
         self.sock.close()
         self._logger.info("Server down.")
 
+    def telephoneBook(self,telephoneDatabase={"Adam": "125654", "Steve": "6504033"}):
+        self._logger.info("Telephone Database initialized and server online.")
+        self.sock.listen(1)
+        while self._serving:
+            try:
+                (connection, address) = self.sock.accept()
+                self._logger.info("Creating server...")
+                while True:  
+                    request = connection.recv(1024)
+                    if not request:
+                        break
+                    requestString = request.decode("ascii")
+                    if(requestString in telephoneDatabase):    
+                        self._logger.info("Received a name and send response.")
+                        connection.send(telephoneDatabase[requestString].encode("ascii"))
+                    elif(requestString == "requestAll"):
+                        self._logger.info("Send all telephone Data to Client.")
+                        telephoneValues = ""  
+                        for (telName, telNumber) in telephoneDatabase.items():
+                            telephoneValues +=telName + ": " + telNumber + ", "
+                        telephoneValues = telephoneValues[:-2]
+                        connection.send(telephoneValues.encode("ascii"))
+                    else:
+                        self._logger.info("Invalid name received.")
+                        connection.send("No Person in Database with that name".encode("ascii"))
+                connection.close()
+            except socket.timeout:
+                pass
+        self.sock.close()
+        self._logger.info("Server down")
+
+
 
 class Client:
     """ The client """
@@ -65,3 +97,24 @@ class Client:
     def close(self):
         """ Close socket """
         self.sock.close()
+
+    def get(self,msg="Steve"):
+        self.logger.info("Getting telephone Number of " + msg + ".")
+        self.sock.send(msg.encode('ascii'))
+        data = self.sock.recv(1024)
+        result = data.decode("ascii")
+        print(result)
+        self.sock.close() 
+        self.logger.info("Client down.")
+        return result
+    
+    def getAll(self):
+        self.logger.info("Getting all available telephone number.")        
+        msg = "requestAll"
+        self.sock.send(msg.encode('ascii'))
+        data = self.sock.recv(1024)
+        result = data.decode("ascii")
+        print(result)
+        self.sock.close() 
+        self.logger.info("Client down.")
+        return result
