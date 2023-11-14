@@ -1,16 +1,21 @@
 import rpc
 import logging
+import time
 
 from context import lab_logging
 
 lab_logging.setup(stream_level=logging.INFO)
 
+def printCallback(result):
+    print("Result: {}".format(result.value))
+
 cl = rpc.Client()
 cl.run()
 
 base_list = rpc.DBList({'foo'})
-result_list = cl.append('bar', base_list)
-
-print("Result: {}".format(result_list.value))
+cl.append(data='bar',db_list= base_list,printCallback= printCallback)
+for i in range(15):
+    print(i)
+    time.sleep(1)
 
 cl.stop()
