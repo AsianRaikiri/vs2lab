@@ -13,6 +13,19 @@ class DBList:
     def append(self, data):
         self.value = self.value + [data]
         return self
+    
+class AsyncDBCall(threading.Thread):
+    def __init__(self,channel, server, message):
+        threading.Thread.__init__(self)
+        self.channel = channel
+        self.server = server
+        self.msglst = message
+        self.returnValue = None
+    def run(self):
+        self.channel.send_to(self.server, self.msglst)  # send msg to server
+        msgrcv = self.channel.receive_from(self.server)  # wait for response
+        self.returnValue = msgrcv[1]
+        print("This is the return Value: " + self.returnValue)
 
 
 class Client:
@@ -20,10 +33,6 @@ class Client:
         self.chan = lab_channel.Channel()
         self.client = self.chan.join('client')
         self.server = None
-        
-    def get_result(self, printCallback): 
-        msgrcv = self.chan.receive_from(self.server)
-        printCallback(msgrcv[1])
 
     def run(self):
         self.chan.bind(self.client)
@@ -32,13 +41,13 @@ class Client:
     def stop(self):
         self.chan.leave('client')
 
-    def append(self, data, db_list, printCallback):
+    async def append(self, data, db_list):
         assert isinstance(db_list, DBList)
         msglst = (constRPC.APPEND, data, db_list)  # message payload
-        self.chan.send_to(self.server, msglst)  # send msg to server
-        msgrcv = self.chan.receive_from(self.server)  # wait for response
-        if msgrcv[1] is constRPC.ACK:
-            threading.Thread(target=self.get_result, args=(printCallback, )).start()
+        newThread = AsyncDBCall(self.chan, self.server, msglst)
+        newThread.start()
+        newThread.join()
+        return newThread.returnValue # pass it to caller
 
 
 class Server:
@@ -60,9 +69,22 @@ class Server:
                 client = msgreq[0]  # see who is the caller
                 msgrpc = msgreq[1]  # fetch call & parameters
                 if constRPC.APPEND == msgrpc[0]:  # check what is being requested
-                    self.chan.send_to({client}, constRPC.ACK)
-                    time.sleep(10)
                     result = self.append(msgrpc[1], msgrpc[2])  # do local call
                     self.chan.send_to({client}, result)  # return response
                 else:
                     pass  # unsupported request, simply ignore
+
+
+import logging
+from context import lab_logging
+lab_logging.setup(stream_level=logging.INFO)
+
+cl = Client()
+cl.run()
+
+base_list = DBList({'foo'})
+result_list = cl.append('bar', base_list)
+
+print("Result: {}".format(result_list.value))
+
+cl.stop()

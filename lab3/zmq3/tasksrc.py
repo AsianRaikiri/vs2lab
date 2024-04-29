@@ -23,3 +23,9 @@ time.sleep(1) # wait to allow all clients to connect
 for i in range(100):  # generate 100 workloads
     workload = random.randint(1, 100)  # compute workload
     push_socket.send(pickle.dumps((me, workload)))  # send workload to worker
+
+#Die Aufgaben werden abwechselnd angenommen von 1 und 2 
+#Beim zweiten kriegen beide Worker abwechselnd Arbeit
+#Die Workload pro Worker halbiert sich dadurch
+#Tasks werden im Socket "gelagert" bis ein Worker existiert
+#Der sie machen kann

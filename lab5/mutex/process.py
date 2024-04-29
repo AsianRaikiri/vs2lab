@@ -2,7 +2,7 @@ import logging
 import random
 import time
 
-from constMutex import ENTER, RELEASE, ALLOW
+from constMutex import ENTER, RELEASE, ALLOW, HEALTHCHECK
 
 
 class Process:
@@ -40,7 +40,7 @@ class Process:
         self.queue = []  # The request queue list
         self.clock = 0  # The current logical clock
         self.logger = logging.getLogger("vs2lab.lab5.mutex.process.Process")
-
+        
     def __mapid(self, id='-1'):
         # resolve channel member address to a human friendly identifier
         if id == '-1':
@@ -102,6 +102,7 @@ class Process:
                 self.__mapid(),
                 "ENTER" if msg[2] == ENTER
                 else "ALLOW" if msg[2] == ALLOW
+                else "HEALTHCHECK" if msg[2] == HEALTHCHECK
                 else "RELEASE", self.__mapid(msg[1])))
 
             if msg[2] == ENTER:
@@ -110,14 +111,20 @@ class Process:
                 self.__allow_to_enter(msg[1])
             elif msg[2] == ALLOW:
                 self.queue.append(msg)  # Append an ALLOW
+            elif msg[2] == HEALTHCHECK:
+                self.clock += 1
+                iAmHealthy = (self.clock, self.process_id, HEALTHCHECK)
+                self.channel.send_to_all( iAmHealthy)
             elif msg[2] == RELEASE:
                 # assure release requester indeed has access (his ENTER is first in queue)
                 assert self.queue[0][1] == msg[1] and self.queue[0][2] == ENTER, 'State error: inconsistent remote RELEASE'
                 del (self.queue[0])  # Just remove first message
-
+            
             self.__cleanup_queue()  # Finally sort and cleanup the queue
-        else:        
-            self.logger.warning("{} timed out on RECEIVE.".format(self.__mapid()))
+        else: 
+            self.logger.warning("{}:  At least one process terminated".format(self.__mapid()))  
+            self.healthCheck()
+            
 
     def init(self):
         self.channel.bind(self.process_id)
@@ -132,10 +139,30 @@ class Process:
         self.logger.info("Member {} joined channel as {}."
                          .format(self.process_id, self.__mapid()))
 
+    def healthCheck(self):
+        self.clock += 1
+        healthMessage = (self.clock, self.process_id, HEALTHCHECK)
+        self.channel.send_to(self.other_processes, healthMessage)
+        healthy = []
+        for i in range(len(self.other_processes)):
+            receive = self.channel.receive_from(self.other_processes, 10)
+            if(receive):
+                if(receive[1][1] != self.process_id and receive[1][2] == HEALTHCHECK):
+                    healthy.append(receive[1][1])
+        healthy.sort()
+        self.other_processes = list(set(healthy))
+        healthy.append(self.process_id)
+        newQueue = []
+        for i in range(len(self.queue)):
+            if self.queue[i][1] in healthy:
+                newQueue.append(self.queue[i])
+        self.queue = newQueue
+
     def run(self):
         while True:
             # Enter the critical section if there are more than one process left
             # and random is true
+
             if len(self.all_processes) > 1 and \
                     random.choice([True, False]):
                 self.logger.debug("{} wants to ENTER CS at CLOCK {}."

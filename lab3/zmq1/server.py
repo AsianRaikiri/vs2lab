@@ -18,3 +18,7 @@ while True:
         reply_socket.send((message.decode() + "*").encode())  # append "*" to message
     else:  # else...
         break  # break out of loop and end
+
+#Zuerst werden alle Anfragen des einen Sockets bearbeitet
+#danach werden, die Anfragen des anderen Sockets bearbeitet
+#Keine Ahnung, maybe priorities 

@@ -103,15 +103,57 @@ class ChordNode:
         :param key: key to be located
         :return: located node name
         """
+
         if self.in_between(key, self.finger_table[0] + 1, self.node_id + 1):  # key in (FT[0],self]
+            print("This is the right node for request {}, with Node Number {}".format(key, self.node_id))
             return self.node_id  # node is responsible
         elif self.in_between(key, self.node_id + 1, self.finger_table[1]):  # key in (self,FT[1]]
-            return self.finger_table[1]  # successor responsible
+            # how to call the actual node, don't use self.local_successor_node
+            # same for the other questions
+            print("Fingered ID: {}".format(self.finger_table[1]))
+            self.channel.send_to([str(self.finger_table[1])], (constChord.LOOKUP_REQ, key))
+            message = self.channel.receive_from([str(self.finger_table[1])])
+            sender = message[0]
+            request = message[1]
+            while (request[0] != constChord.LOOKUP_REP):
+                message = self.channel.receive_from([str(self.finger_table[1])])
+                sender = message[0]
+                request = message[1]
+            self.logger.info("Node {:04n} received RESULT {:04n} from {:04n}."
+                        .format(self.node_id, int(request[1]), int(sender)))
+            next_id: int = request[1]         
+            return next_id
+        
         for i in range(1, self.n_bits):  # go through rest of FT
-            if self.in_between(key, self.finger_table[i], self.finger_table[(i + 1) ]):
-                return self.finger_table[i]  # key in [FT[i],FT[i+1])
+            if self.in_between(key, self.finger_table[i], self.finger_table[(i + 1) ]): 
+                print("Fingered ID: {}".format(self.finger_table[i]))   
+                self.channel.send_to([str(self.finger_table[i])], (constChord.LOOKUP_REQ, key)) # key in [FT[i],FT[i+1])
+                message = self.channel.receive_from([str(self.finger_table[i])])
+                sender = message[0]
+                request = message[1]
+                while (request[0] != constChord.LOOKUP_REP):
+                    message = self.channel.receive_from([str(self.finger_table[i])])
+                    sender = message[0]
+                    request = message[1]
+                self.logger.info("Node {:04n} received RESULT {:04n} from {:04n}."
+                    .format(self.node_id, int(request[1]), int(sender)))
+                next_id: int = request[1]
+                return next_id
+
         if self.in_between(key, self.finger_table[-1], self.finger_table[0] + 1): # key outside FT
-            return self.finger_table[-1]  # key in [FT[-1],FT[0]]
+            print("Fingered ID: {}".format(self.finger_table[-1]))
+            self.channel.send_to([str(self.finger_table[-1])], (constChord.LOOKUP_REQ, key)) 
+            message = self.channel.receive_from([str(self.finger_table[-1])])
+            sender = message[0]
+            request = message[1]
+            while (request[0] != constChord.LOOKUP_REP):
+                message = self.channel.receive_from([str(self.finger_table[-1])])
+                sender = message[0]
+                request = message[1]
+            self.logger.info("Node {:04n} received RESULT {:04n} from {:04n}."
+                .format(self.node_id, int(request[1]), int(sender)))
+            next_id: int = request[1]
+            return next_id
         assert False # we cannot be here
 
     def enter(self):
@@ -136,7 +178,6 @@ class ChordNode:
             message = self.channel.receive_from_any()  # Wait for any request
             sender: str = message[0]  # Identify the sender
             request = message[1]  # And the actual request
-
             # If sender is a node (that stays in the ring) then update known nodes
             if request[0] != constChord.LEAVE and self.channel.channel.sismember('node', sender):
                 self.add_node(sender)  # remember sender node

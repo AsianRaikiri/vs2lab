@@ -19,8 +19,10 @@ pull_socket.connect(address2)  # connect to task source 2
 time.sleep(1) 
 
 print("{} started".format(me))
-
+i = 0
 while True:
     work = pickle.loads(pull_socket.recv())  # receive work from a source
+    i += 1
     print("{} received workload {} from {}".format(me, work[1], work[0]))
     time.sleep(work[1] * 0.01)  # pretend to work
+    print("{} times done the work.".format(i))

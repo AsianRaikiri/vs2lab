@@ -14,3 +14,7 @@ while True:
     time.sleep(5)  # wait every 5 seconds
     publisher.send(("TIME " + str(datetime.datetime.now().time())).encode())  # publish the current time
     publisher.send(("DATE " + str(datetime.date.today())).encode())  # publish the current date
+
+#anhand des ersten Wortes in der Message wird die
+#Topic definiert, diese wird dann vom jeweiligen Client
+#abgerufen. Der Rest wird ignoriert
